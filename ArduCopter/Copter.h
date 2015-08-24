@@ -1,4 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
+#ifndef _COPTER_H_
+#define _COPTER_H_
 
 #define THISFIRMWARE "APM:Copter V3.3.3-rc1_test"
 #define FIRMWARE_VERSION 3,3,3,FIRMWARE_VERSION_TYPE_RC
@@ -997,3 +999,5 @@ public:
 
 extern const AP_HAL::HAL& hal;
 extern Copter copter;
+
+#endif // _COPTER_H_
