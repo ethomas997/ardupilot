@@ -664,10 +664,12 @@ void Plane::channel_output_mixer(uint8_t mixing_type, int16_t &chan1_out, int16_
     // apply MIXING_OFFSET to input channels using long-integer version
     //  of formula:  x = x * (g.mixing_offset/100.0 + 1.0)
     //  -100 => 2x on 'c1', 100 => 2x on 'c2'
-    if (g.mixing_offset < 0)
+    if (g.mixing_offset < 0) {
       c1 = (int16_t)(((int32_t)c1) * (-g.mixing_offset+100) / 100);
-    else if (g.mixing_offset > 0)
+    }
+    else if (g.mixing_offset > 0) {
       c2 = (int16_t)(((int32_t)c2) * (g.mixing_offset+100) / 100);
+    }
 
     v1 = (c1 - c2) * g.mixing_gain;
     v2 = (c1 + c2) * g.mixing_gain;
