@@ -153,6 +153,8 @@ public:
         k_param_fence_retalt = 105,
         k_param_fence_autoenable,
         k_param_fence_ret_rally,
+        k_param_mixing_offset,
+        k_param_dspoiler_rud_rate,
 
         // 110: Telemetry control
         //
@@ -455,6 +457,8 @@ public:
     AP_Int8 reverse_elevons;
     AP_Int8 reverse_ch1_elevon;
     AP_Int8 reverse_ch2_elevon;
+    AP_Int16 mixing_offset;
+    AP_Int16 dspoiler_rud_rate;
     AP_Int16 num_resets;
     AP_Int32 log_bitmask;
     AP_Int8 reset_switch_chan;
