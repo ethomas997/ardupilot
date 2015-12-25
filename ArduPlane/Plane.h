@@ -968,6 +968,8 @@ private:
     void calc_nav_roll();
     void calc_nav_pitch();
     void update_flight_stage();
+    GPSFailCurrentState handle_gps_xtrk_failure(bool gps_ok_flag,
+                    bool xtrk_ok_flag, GPSFailCurrentState hdlr_fail_state);
     void update_navigation();
     void set_flight_stage(AP_SpdHgtControl::FlightStage fs);
     bool is_flying(void);
