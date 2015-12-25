@@ -152,6 +152,8 @@ public:
         k_param_fence_retalt = 105,
         k_param_fence_autoenable,
         k_param_fence_ret_rally,
+        k_param_gps_fail_action,
+        k_param_xtrack_fail_lim,
 
         // 110: Telemetry control
         //
@@ -489,6 +491,8 @@ public:
     AP_Int8 override_channel;
 #endif
     AP_Int16 gcs_pid_mask;
+    AP_Int8 gps_fail_action;
+    AP_Int16 xtrack_fail_lim;
 
     // RC channels
     RC_Channel rc_1;
