@@ -415,6 +415,17 @@ void Plane::set_mode(enum FlightMode mode)
         break;
 
     case AUTO:
+#if GEOFENCE_ENABLED == ENABLED
+        if ((g.fence_autoenable == AUTOMODE_GFENABLE ||
+             g.fence_autoenable == AUTOMODE_NOFlOOR_GFENABLE) &&
+            !geofence_enabled()) {
+            if (! geofence_set_enabled(true, AUTO_TOGGLED)) {
+                gcs_send_text_P(MAV_SEVERITY_CRITICAL, PSTR("Enable fence on auto mode failed (cannot autoenable"));
+            } else {
+                gcs_send_text_P(MAV_SEVERITY_CRITICAL, PSTR("Fence enabled by entering auto mode"));
+            }
+        }
+#endif
         auto_throttle_mode = true;
         next_WP_loc = prev_WP_loc = current_loc;
         // start or resume the mission, based on MIS_AUTORESET
@@ -769,6 +780,18 @@ bool Plane::arm_motors(AP_Arming::ArmingMethod method)
     channel_throttle->enable_out();
 
     change_arm_state();
+
+#if GEOFENCE_ENABLED == ENABLED
+    if (g.fence_autoenable == ARM_GFENABLE && !geofence_enabled()) {
+        if (geofence_set_enabled(true, ARM_ENABLED)) {
+            gcs_send_text_fmt(PSTR("Geo-fence enabled via motor arming"));
+        } else {
+            gcs_send_text_P(MAV_SEVERITY_CRITICAL,
+                            PSTR("Unable to enable geo-fence via motor arming"));
+        }
+    }
+#endif
+
     return true;
 }
 
