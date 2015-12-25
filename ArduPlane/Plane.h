@@ -3,7 +3,7 @@
 #ifndef _PLANE_H
 #define _PLANE_H
 
-#define THISFIRMWARE "ArduPlane V3.4.0"
+#define THISFIRMWARE "ArduPlane-3.4.0rel_etFenceGPSfHdlr"
 #define FIRMWARE_VERSION 3,4,0,FIRMWARE_VERSION_TYPE_OFFICIAL
 
 /*
@@ -912,6 +912,8 @@ private:
     void calc_nav_roll();
     void calc_nav_pitch();
     void update_flight_stage();
+    GPSFailCurrentState handle_gps_xtrk_failure(bool gps_ok_flag,
+                    bool xtrk_ok_flag, GPSFailCurrentState hdlr_fail_state);
     void update_navigation();
     void set_flight_stage(AP_SpdHgtControl::FlightStage fs);
     bool is_flying(void);

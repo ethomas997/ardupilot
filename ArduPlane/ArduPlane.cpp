@@ -432,7 +432,9 @@ void Plane::update_GPS_10Hz(void)
     // get position from AHRS
     have_position = ahrs.get_position(current_loc);
 
+    static GPSFailCurrentState gps_fail_state = GPS_FAIL_NONE;
     static uint32_t last_gps_msg_ms;
+    bool gps_ok_flag=true, xtrk_ok_flag=true;
     if (gps.last_message_time_ms() != last_gps_msg_ms && gps.status() >= AP_GPS::GPS_OK_FIX_3D) {
         last_gps_msg_ms = gps.last_message_time_ms();
 
@@ -475,6 +477,39 @@ void Plane::update_GPS_10Hz(void)
 
         // update wind estimate
         ahrs.estimate_wind();
+
+        if (g.gps_fail_action > GPSFAIL_NO_ACTION) {
+            //if limit set then check xtrack_error value:
+            if (g.xtrack_fail_lim > 0 &&
+                labs((long)(nav_controller->crosstrack_error())) >
+                g.xtrack_fail_lim) {
+                xtrk_ok_flag = false;
+            }
+            //if failure in progress or flagged then call handler:
+            if (gps_fail_state != GPS_FAIL_NONE || !xtrk_ok_flag) {
+                gps_fail_state = handle_gps_xtrk_failure(
+                                     true, xtrk_ok_flag, gps_fail_state);
+            }
+        }
+    } else if (g.gps_fail_action > GPSFAIL_NO_ACTION) {
+        if (gps.status() < AP_GPS::GPS_OK_FIX_2D ||
+            (gps.last_message_time_ms() == last_gps_msg_ms &&
+             hal.scheduler->millis() - gps.last_message_time_ms() > 1500)) {
+            gps_ok_flag = false;  //GPS lost fix or stopped sending data
+        }
+        last_gps_msg_ms = gps.last_message_time_ms();
+        //if limit set then check xtrack_error value:
+        if (g.xtrack_fail_lim > 0 &&
+            labs((long)(nav_controller->crosstrack_error())) >
+            g.xtrack_fail_lim) {
+            xtrk_ok_flag = false;
+        }
+        //if failure in progress or flagged then call handler:
+        if (gps_fail_state != GPS_FAIL_NONE ||
+            !gps_ok_flag || !xtrk_ok_flag) {
+            gps_fail_state = handle_gps_xtrk_failure(
+                                 gps_ok_flag, xtrk_ok_flag, gps_fail_state);
+        }
     }
 
     calc_gndspeed_undershoot();
@@ -777,13 +812,17 @@ void Plane::set_flight_stage(AP_SpdHgtControl::FlightStage fs)
     switch (fs) {
     case AP_SpdHgtControl::FLIGHT_LAND_APPROACH:
 #if GEOFENCE_ENABLED == ENABLED 
-        if (g.fence_autoenable == 1) {
+        if ((g.fence_autoenable == TAKEOFF_GFENABLE ||
+                                 g.fence_autoenable == AUTOMODE_GFENABLE) &&
+                                                       geofence_enabled()) {
             if (! geofence_set_enabled(false, AUTO_TOGGLED)) {
                 gcs_send_text_P(MAV_SEVERITY_CRITICAL, PSTR("Disable fence failed (autodisable)"));
             } else {
                 gcs_send_text_P(MAV_SEVERITY_CRITICAL, PSTR("Fence disabled (autodisable)"));
             }
-        } else if (g.fence_autoenable == 2) {
+        } else if ((g.fence_autoenable == TAKEOFF_NOFlOOR_GFENABLE ||
+                         g.fence_autoenable == AUTOMODE_NOFlOOR_GFENABLE) &&
+                                                       geofence_enabled()) {
             if (! geofence_set_floor_enabled(false)) {
                 gcs_send_text_P(MAV_SEVERITY_CRITICAL, PSTR("Disable fence floor failed (autodisable)"));
             } else {
@@ -878,6 +917,126 @@ void Plane::update_flight_stage(void)
     airspeed.set_EAS2TAS(barometer.get_EAS2TAS());
 }
 
+/*
+  handling GPS failure and recovery
+  Returns the new value for 'gps_fail_state'
+ */
+GPSFailCurrentState Plane::handle_gps_xtrk_failure(bool gps_ok_flag,
+        bool xtrk_ok_flag, GPSFailCurrentState hdlr_fail_state)
+{
+    static uint32_t last_handler_timems = 0;     //last GPS-fail time
+    static uint32_t fail_start_timems = 0;       //saved fail start time
+    static FlightMode prev_cntrl_mode = MANUAL;  //previous flight mode
+    static int16_t circle_disarm_secs = 0;       //delay before disarm
+
+    if (!arming.is_armed()) {          //if motor disarmed then
+        return GPS_FAIL_NONE;          //abort any handler action
+    }
+
+    GPSFailCurrentState new_gps_fail_state = hdlr_fail_state;
+    if (!gps_ok_flag || !xtrk_ok_flag) {    //GPS or xtrack_error not OK
+        uint32_t now_ms = hal.scheduler->millis();
+        last_handler_timems = now_ms;            //mark this GPS-fail time
+
+        switch (hdlr_fail_state) {
+        case GPS_FAIL_NONE:        //no current GPS failure action
+            //check if control mode is fully GPS dependent:
+            if (control_mode == AUTO || control_mode == RTL ||
+                control_mode == GUIDED || control_mode == LOITER) {
+                fail_start_timems = now_ms;
+                new_gps_fail_state = GPS_FAIL_INITWAIT;
+            }
+            break;
+
+        case GPS_FAIL_INITWAIT:    //initial wait after failure
+            if (control_mode == AUTO || control_mode == RTL ||
+                control_mode == GUIDED || control_mode == LOITER) {
+                //if failure longer than 5 secs then do action:
+                if (now_ms - fail_start_timems >= 5000) {
+                    if (g.gps_fail_action == GPSFAIL_DISARM_MOTOR) {
+                        set_mode(STABILIZE);    //try to keep plane level
+                        disarm_motors();        //stop motor
+                        new_gps_fail_state = GPS_FAIL_DISARMED;
+                        gcs_send_text_fmt(PSTR(
+                                          "gpsXtrk-fail disarmed motor, gpsOK=%d, xtrkOK=%d"),
+                                          (int)gps_ok_flag, (int)xtrk_ok_flag);
+                    } else {
+                        prev_cntrl_mode = control_mode;
+                        //setup wait time for motor disarm:
+                        switch (g.gps_fail_action) {
+                        case GPSFAIL_CIRCLE_5SECDISARM:
+                            circle_disarm_secs = 5;
+                            break;
+                        case GPSFAIL_CIRCLE_10SECDISARM:
+                            circle_disarm_secs = 10;
+                            break;
+                        case GPSFAIL_CIRCLE_30SECDISARM:
+                            circle_disarm_secs = 30;
+                            break;
+                        case GPSFAIL_CIRCLE_1MINDISARM:
+                            circle_disarm_secs = 60;
+                            break;
+                        case GPSFAIL_CIRCLE_2MINDISARM:
+                            circle_disarm_secs = 120;
+                            break;
+                        case GPSFAIL_CIRCLE_5MINDISARM:
+                            circle_disarm_secs = 300;
+                            break;
+                        default:
+                            circle_disarm_secs = 0;   //never disarm
+                        }
+                        set_mode(CIRCLE);
+                        fail_start_timems = now_ms;
+                        new_gps_fail_state = GPS_FAIL_CIRCLING;
+                        gcs_send_text_fmt(PSTR(
+                                          "gpsXtrk-fail set CIRCLE mode, gpsOK=%d, xtrkOK=%d"),
+                                          (int)gps_ok_flag, (int)xtrk_ok_flag);
+                    }
+                }
+            } else {     //flight mode changed; abort handler action
+                new_gps_fail_state = GPS_FAIL_NONE;
+            }
+            break;
+
+        case GPS_FAIL_CIRCLING:    //flight mode changed to CIRCLE
+            if (control_mode == CIRCLE) {    //flight mode unchanged
+                //check if time to disarm motor:
+                if (circle_disarm_secs > 0 &&
+                    now_ms - fail_start_timems >=
+                    (uint32_t)circle_disarm_secs * 1000) {
+                    disarm_motors();              //stop motor
+                    new_gps_fail_state = GPS_FAIL_DISARMED;
+                    gcs_send_text_fmt(PSTR(
+                                      "gpsXtrk-fail motor disarmed, gpsOK=%d, xtrkOK=%d"),
+                                      (int)gps_ok_flag, (int)xtrk_ok_flag);
+                }
+            } else {     //flight mode changed; abort handler actions
+                new_gps_fail_state = GPS_FAIL_NONE;   //reset fail status
+            }
+            break;
+
+        case GPS_FAIL_DISARMED:    //motor disarmed
+            break;
+        }
+    } else { //GPS and xtrack_error are OK
+        //check handler action is 'circling' and flight mode unchanged:
+        if (hdlr_fail_state == GPS_FAIL_CIRCLING && control_mode == CIRCLE) {
+            uint32_t now_ms = hal.scheduler->millis();
+            //check that all has been OK for more than 2 seconds:
+            if (now_ms - last_handler_timems >= 2000) {
+                set_mode(prev_cntrl_mode);            //restore flight mode
+                new_gps_fail_state = GPS_FAIL_NONE;   //abort handler action
+                gcs_send_text_fmt(PSTR("gpsXtrk-fail restored flight mode"));
+            } else {   //wait for all to be OK longer
+                fail_start_timems = now_ms;  //delay disarm in the meantime
+            }
+        } else {   //not circling
+            new_gps_fail_state = GPS_FAIL_NONE;      //abort handler action
+        }
+    }
+
+    return new_gps_fail_state;        //return (possibly-modified) value
+}
 
 
 

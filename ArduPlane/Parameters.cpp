@@ -322,8 +322,8 @@ const AP_Param::Info Plane::var_info[] PROGMEM = {
 #if GEOFENCE_ENABLED == ENABLED
     // @Param: FENCE_ACTION
     // @DisplayName: Action on geofence breach
-    // @Description: What to do on fence breach. If this is set to 0 then no action is taken, and geofencing is disabled. If this is set to 1 then the plane will enter GUIDED mode, with the target waypoint as the fence return point. If this is set to 2 then the fence breach is reported to the ground station, but no other action is taken. If set to 3 then the plane enters guided mode but the pilot retains manual throttle control.
-    // @Values: 0:None,1:GuidedMode,2:ReportOnly,3:GuidedModeThrPass
+    // @Description: What to do on fence breach. If this is set to 0 then no action is taken, and geofencing is disabled. If this is set to 1 then the plane will enter GUIDED mode, with the target waypoint as the fence return point. If this is set to 2 then the fence breach is reported to the ground station, but no other action is taken. If set to 3 then the plane enters guided mode but the pilot retains manual throttle control. If set to 4, after a fence breach lasting more than five seconds the flight mode is changed to STABILIZED and the motor is disarmed (glide to ground).
+    // @Values: 0:None,1:GuidedMode,2:ReportOnly,3:GuidedModeThrPass,4:DisarmMotor
     // @User: Standard
     GSCALAR(fence_action,           "FENCE_ACTION",   0),
 
@@ -368,8 +368,8 @@ const AP_Param::Info Plane::var_info[] PROGMEM = {
 
     // @Param: FENCE_AUTOENABLE
     // @DisplayName: Fence automatic enable
-    // @Description: When set to 1, geofence automatically enables after an auto takeoff and automatically disables at the beginning of an auto landing.  When on the ground before takeoff the fence is disabled.  When set to 2, the fence autoenables after an auto takeoff, but only disables the fence floor during landing. It is highly recommended to not use this option for line of sight flying and use a fence enable channel instead.
-    // @Values: 0:NoAutoEnable,1:AutoEnable,2:AutoEnableDisableFloorOnly
+    // @Description: When set to 1, geofence automatically enables after an auto takeoff and automatically disables at the beginning of an auto landing. When on the ground before takeoff the fence is disabled. When set to 2, the fence autoenables after an auto takeoff, but only disables the fence floor during landing. When set to 3, geofence automatically enables after the AUTO flight mode is engaged and automatically disables at the beginning of an auto landing. When set to 4, the fence autoenables after the AUTO flight mode is engaged, but only disables the fence floor during landing. When set to 5, geofence enables after the motor is armed (and does not automatically disable later). It is recommended to not use this option for line of sight flying and use a fence enable channel instead.
+    // @Values: 0:NoAutoEnable,1:AutoTakeoffEnable,2:AutoTakeoffEnableDisableFloorOnly,3:AutoModeEnable,4:AutoModeEnableDisableFloorOnly,5:MotorArmEnable
     // @User: Standard
     GSCALAR(fence_autoenable,       "FENCE_AUTOENABLE", 0),
 
@@ -584,6 +584,22 @@ const AP_Param::Info Plane::var_info[] PROGMEM = {
     // @Values: 0:Disabled,1:Heartbeat,2:HeartbeatAndREMRSSI,3:HeartbeatAndAUTO
     // @User: Standard
     GSCALAR(gcs_heartbeat_fs_enabled, "FS_GCS_ENABL", GCS_FAILSAFE_OFF),
+
+    // @Param: GPS_FAIL_ACTION
+    // @DisplayName: Action on GPS Fail
+    // @Description: Action to be taken when a GPS failure is detected while in the AUTO, GUIDED, RTL or LOITER flight mode. A GPS failure is when its fix is lost for more than five seconds. If 0 then no action. If 1 then change to CIRCLE flight mode (and restore the previous flight mode if a GPS fix is regained). If 2 through 7 then change to CIRCLE flight mode for the given time, and then, if a GPS fix has not been regained, disarm the motor. If a GPS fix is regained then the previous flight mode is restored. If 8 then change to STABILIZED flight mode and disarm the motor immediately (glide to ground).
+    // @Values: 0:NoAction,1:Circle,2:Circle5SecDisarm,3:Circle10SecDisarm,4:Circle30SecDisarm,5:Circle1MinDisarm,6:Circle2MinDisarm,7:Circle5MinDisarm,8:DisarmMotor
+    // @User: Standard
+    GSCALAR(gps_fail_action,        "GPS_FAIL_ACTION", GPSFAIL_NO_ACTION),
+
+    // @Param: XTRACK_FAIL_LIM
+    // @DisplayName: Crosstrack Failure Limit
+    // @Description: When this setting is greater than zero, the fight mode is AUTO, GUIDED, RTL or LOITER, and the navigation crosstrack error (xtrack_error) is larger than this setting for more than five seconds, the action configured by GPS_FAIL_ACTION will be taken. The setting is specified in meters. A large crosstrack error can indicate sensor or mechanical failure. A value of 200 (meters) is effective for detecting failures.
+    // @Units: Meters
+    // @Range: 0 32767
+    // @Increment: 1
+    // @User: Standard
+    GSCALAR(xtrack_fail_lim,        "XTRACK_FAIL_LIM", 0),
 
     // @Param: FLTMODE_CH
     // @DisplayName: Flightmode channel

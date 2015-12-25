@@ -503,11 +503,13 @@ bool Plane::verify_takeoff()
         next_WP_loc = prev_WP_loc = current_loc;
 
 #if GEOFENCE_ENABLED == ENABLED
-        if (g.fence_autoenable > 0) {
+        if ((g.fence_autoenable == TAKEOFF_GFENABLE ||
+                          g.fence_autoenable == TAKEOFF_NOFlOOR_GFENABLE) &&
+                                                      !geofence_enabled()) {
             if (! geofence_set_enabled(true, AUTO_TOGGLED)) {
                 gcs_send_text_P(MAV_SEVERITY_CRITICAL, PSTR("Enable fence failed (cannot autoenable"));
             } else {
-                gcs_send_text_P(MAV_SEVERITY_CRITICAL, PSTR("Fence enabled. (autoenabled)"));
+                gcs_send_text_P(MAV_SEVERITY_CRITICAL, PSTR("Fence enabled by auto takeoff"));
             }
         }
 #endif
