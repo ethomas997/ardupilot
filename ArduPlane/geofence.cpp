@@ -11,6 +11,8 @@
 #define MIN_GEOFENCE_POINTS 5 // 3 to define a minimal polygon (triangle)
                               // + 1 for return point and +1 for last
                               // pt (same as first)
+#define ACTION_DISARM_DELAYMS 5000     //delay between breach and disarm
+//#define GEOFENCE_DEBUG_MSGS
 
 /*
  *  The state of geo-fencing. This structure is dynamically allocated
@@ -94,6 +96,9 @@ void Plane::geofence_load(void)
     uint8_t i;
 
     if (geofence_state == NULL) {
+#if defined(GEOFENCE_DEBUG_MSGS)
+        gcs_send_text_P(MAV_SEVERITY_ALERT, PSTR("GFDBG geofence_load():  Allocating data"));
+#endif
         uint16_t boundary_size = sizeof(Vector2l) * max_fencepoints();
         if (hal.util->available_memory() < 100 + boundary_size + sizeof(struct GeofenceState)) {
             // too risky to enable as we could run out of stack
@@ -241,8 +246,9 @@ bool Plane::geofence_set_floor_enabled(bool floor_enable) {
     if (geofence_state == NULL) {
         return false;
     }
-    
-    geofence_state->floor_enabled = floor_enable;
+    //if FENCE_ACTION_DISARM then never allow FENCE_BREACH_MINALT
+    geofence_state->floor_enabled =
+        (g.fence_action != FENCE_ACTION_DISARM) ? floor_enable : false;
     return true;
 }
 
@@ -291,6 +297,9 @@ void Plane::geofence_check(bool altitude_check_only)
             geofence_state->old_switch_position == oldSwitchPosition &&
             guided_WP_loc.lat == geofence_state->guided_lat &&
             guided_WP_loc.lng == geofence_state->guided_lng) {
+#if defined(GEOFENCE_DEBUG_MSGS)
+            gcs_send_text_P(MAV_SEVERITY_ALERT, PSTR("GFDBG geofence_check():  Restoring control mode"));
+#endif
             geofence_state->old_switch_position = 254;
             set_mode(get_previous_mode());
         }
@@ -347,30 +356,50 @@ void Plane::geofence_check(bool altitude_check_only)
     }
 
     // we are outside the fence
-    if (geofence_state->fence_triggered &&
-        (control_mode == GUIDED || g.fence_action == FENCE_ACTION_REPORT)) {
-        // we have already triggered, don't trigger again until the
-        // user disables/re-enables using the fence channel switch
-        return;
-    }
+    if (geofence_state->fence_triggered) {
+        if (control_mode == GUIDED || g.fence_action == FENCE_ACTION_REPORT) {
+            // we have already triggered, don't trigger again until the
+            // user disables/re-enables using the fence channel switch
+            return;
+        }
+        if (g.fence_action == FENCE_ACTION_DISARM && (!arming.is_armed() ||
+                millis() < geofence_state->breach_time + ACTION_DISARM_DELAYMS)) {
+            // motor not armed, or doing delay between fence breach and disarm
+            return;
+        }
+    } else {
 
-    // we are outside, and have not previously triggered.
-    geofence_state->fence_triggered = true;
-    geofence_state->breach_count++;
-    geofence_state->breach_time = millis();
-    geofence_state->breach_type = breach_type;
+        // we are outside, and have not previously triggered.
+        geofence_state->fence_triggered = true;
+        geofence_state->breach_count++;
+        geofence_state->breach_time = millis();
+        geofence_state->breach_type = breach_type;
 
  #if FENCE_TRIGGERED_PIN > 0
-    hal.gpio->pinMode(FENCE_TRIGGERED_PIN, HAL_GPIO_OUTPUT);
-    hal.gpio->write(FENCE_TRIGGERED_PIN, 1);
+        hal.gpio->pinMode(FENCE_TRIGGERED_PIN, HAL_GPIO_OUTPUT);
+        hal.gpio->write(FENCE_TRIGGERED_PIN, 1);
  #endif
 
-    gcs_send_text_P(MAV_SEVERITY_WARNING,PSTR("geo-fence triggered"));
-    gcs_send_message(MSG_FENCE_STATUS);
+        gcs_send_text_P(MAV_SEVERITY_WARNING,PSTR("geo-fence triggered"));
+        gcs_send_message(MSG_FENCE_STATUS);
+#if defined(GEOFENCE_DEBUG_MSGS)
+        gcs_send_text_fmt(PSTR("GFDBG geofence_check():  type=%d, count=%d, action=%d"),
+                       (int)breach_type, (int)(geofence_state->breach_count), (int)(g.fence_action));
+#endif
+    }
 
     // see what action the user wants
     switch (g.fence_action) {
     case FENCE_ACTION_REPORT:
+        break;
+
+    case FENCE_ACTION_DISARM:
+        // check if delay time reached
+        if (millis() >= geofence_state->breach_time + ACTION_DISARM_DELAYMS) {
+            set_mode(STABILIZE);       //try to keep plane level
+            disarm_motors();           //stop motor
+            gcs_send_text_P(MAV_SEVERITY_WARNING,PSTR("geo-fence disarmed motor"));
+        }
         break;
 
     case FENCE_ACTION_GUIDED:
