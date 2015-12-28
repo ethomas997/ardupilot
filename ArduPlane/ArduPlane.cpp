@@ -806,13 +806,17 @@ void Plane::set_flight_stage(AP_SpdHgtControl::FlightStage fs)
     case AP_SpdHgtControl::FLIGHT_LAND_APPROACH:
         gcs_send_text_fmt(MAV_SEVERITY_INFO, "Landing approach start at %.1fm", (double)relative_altitude());
 #if GEOFENCE_ENABLED == ENABLED 
-        if (g.fence_autoenable == 1) {
+        if ((g.fence_autoenable == TAKEOFF_GFENABLE ||
+                                 g.fence_autoenable == AUTOMODE_GFENABLE) &&
+                                                       geofence_enabled()) {
             if (! geofence_set_enabled(false, AUTO_TOGGLED)) {
                 gcs_send_text(MAV_SEVERITY_NOTICE, "Disable fence failed (autodisable)");
             } else {
                 gcs_send_text(MAV_SEVERITY_NOTICE, "Fence disabled (autodisable)");
             }
-        } else if (g.fence_autoenable == 2) {
+        } else if ((g.fence_autoenable == TAKEOFF_NOFlOOR_GFENABLE ||
+                         g.fence_autoenable == AUTOMODE_NOFlOOR_GFENABLE) &&
+                                                       geofence_enabled()) {
             if (! geofence_set_floor_enabled(false)) {
                 gcs_send_text(MAV_SEVERITY_NOTICE, "Disable fence floor failed (autodisable)");
             } else {
