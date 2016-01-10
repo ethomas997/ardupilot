@@ -224,9 +224,6 @@ public:
     uint32_t get_accel_clip_count(uint8_t instance) const;
 #endif
 
-    // check for vibration movement. True when all axis show nearly zero movement
-    bool is_still();
-
     /*
       HIL set functions. The minimum for HIL is set_accel() and
       set_gyro(). The others are option for higher fidelity log
@@ -358,9 +355,6 @@ private:
     uint32_t _accel_clip_count[INS_MAX_INSTANCES];
     LowPassFilterVector3f _accel_vibe_floor_filter[INS_VIBRATION_CHECK_INSTANCES];
     LowPassFilterVector3f _accel_vibe_filter[INS_VIBRATION_CHECK_INSTANCES];
-
-    // threshold for detecting stillness
-    AP_Float _still_threshold;
 #endif
 
     /*
