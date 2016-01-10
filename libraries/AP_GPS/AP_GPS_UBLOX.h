@@ -402,8 +402,6 @@ private:
     uint8_t rate_update_step;
     uint32_t _last_5hz_time;
 
-    bool noReceivedHdop;
-
     void 	    _configure_navigation_rate(uint16_t rate_ms);
     void        _configure_message_rate(uint8_t msg_class, uint8_t msg_id, uint8_t rate);
     void        _configure_gps(void);
