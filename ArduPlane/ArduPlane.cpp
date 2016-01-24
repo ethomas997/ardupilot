@@ -424,7 +424,6 @@ void Plane::update_GPS_10Hz(void)
     // get position from AHRS
     have_position = ahrs.get_position(current_loc);
 
-    static GPSFailCurrentState gps_fail_state = GPS_FAIL_NONE;
     static uint32_t last_gps_msg_ms;
     bool gps_ok_flag=true, xtrk_ok_flag=true;
     if (gps.last_message_time_ms() != last_gps_msg_ms && gps.status() >= AP_GPS::GPS_OK_FIX_3D) {
@@ -470,7 +469,7 @@ void Plane::update_GPS_10Hz(void)
         // update wind estimate
         ahrs.estimate_wind();
 
-        if (g.gps_fail_action > GPSFAIL_NO_ACTION) {
+        if (g.gps_fail_action != GPSFAIL_NO_ACTION) {
             //if limit set then check xtrack_error value:
             if (g.xtrack_fail_lim > 0 &&
                 labs((long)(nav_controller->crosstrack_error())) >
@@ -483,7 +482,7 @@ void Plane::update_GPS_10Hz(void)
                                      true, xtrk_ok_flag, gps_fail_state);
             }
         }
-    } else if (g.gps_fail_action > GPSFAIL_NO_ACTION) {
+    } else if (g.gps_fail_action != GPSFAIL_NO_ACTION) {
         if (gps.status() < AP_GPS::GPS_OK_FIX_2D ||
             (gps.last_message_time_ms() == last_gps_msg_ms &&
              millis() - gps.last_message_time_ms() > 1500)) {
@@ -964,11 +963,6 @@ void Plane::update_flight_stage(void)
 GPSFailCurrentState Plane::handle_gps_xtrk_failure(bool gps_ok_flag,
         bool xtrk_ok_flag, GPSFailCurrentState hdlr_fail_state)
 {
-    static uint32_t last_handler_timems = 0;     //last GPS-fail time
-    static uint32_t fail_start_timems = 0;       //saved fail start time
-    static FlightMode prev_cntrl_mode = MANUAL;  //previous flight mode
-    static int16_t circle_disarm_secs = 0;       //delay before disarm
-
     if (!arming.is_armed()) {          //if motor disarmed then
         return GPS_FAIL_NONE;          //abort any handler action
     }
@@ -980,17 +974,14 @@ GPSFailCurrentState Plane::handle_gps_xtrk_failure(bool gps_ok_flag,
 
         switch (hdlr_fail_state) {
         case GPS_FAIL_NONE:        //no current GPS failure action
-            //check if control mode is fully GPS dependent:
-            if (control_mode == AUTO || control_mode == RTL ||
-                control_mode == GUIDED || control_mode == LOITER) {
+            if (current_control_mode_uses_GPS()) {
                 fail_start_timems = now_ms;
                 new_gps_fail_state = GPS_FAIL_INITWAIT;
             }
             break;
 
         case GPS_FAIL_INITWAIT:    //initial wait after failure
-            if (control_mode == AUTO || control_mode == RTL ||
-                control_mode == GUIDED || control_mode == LOITER) {
+            if (current_control_mode_uses_GPS()) {
                 //if failure longer than 5 secs then do action:
                 if (now_ms - fail_start_timems >= 5000) {
                     if (g.gps_fail_action == GPSFAIL_DISARM_MOTOR) {
