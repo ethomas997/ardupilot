@@ -111,7 +111,7 @@ enum GPSFailActions {
 };
 
 /*
- * State values for 'handle_gps_failure()'
+ * State values for 'handle_gps_xtrk_failure()'
  */
 typedef enum GPSFailCurrentState {
     GPS_FAIL_NONE = 0,       //no GPS failure action
