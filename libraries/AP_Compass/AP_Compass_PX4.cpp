@@ -92,7 +92,13 @@ bool AP_Compass_PX4::init(void)
         }
 
         // remember if the compass is external
-        set_external(_instance[i], ioctl(_mag_fd[i], MAGIOCGEXTERNAL, 0) > 0);
+        if (i > (uint8_t)0) {
+            // if not first compass then always external
+            set_external(_instance[i], true);
+        } else {
+            // first compass may be internal on some PX4v1 boards
+            set_external(_instance[i], ioctl(_mag_fd[i], MAGIOCGEXTERNAL, 0) > 0);
+        }
         _count[i] = 0;
         _sum[i].zero();
     }
