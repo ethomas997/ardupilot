@@ -45,6 +45,29 @@ then
 fi
 set logfile /fs/microsd/APM/BOOT.LOG
 
+# verify microSD access
+if echo "test" >> $logfile
+then
+  if [ ! -f $logfile ]
+  then
+    echo "unable to write to microSD; rebooting"
+    sleep 1
+    reboot
+  fi
+  if rm $logfile
+  then
+     echo "verified write to microSD"
+  else
+    echo "write to microSD failed; rebooting"
+    sleep 1
+    reboot
+  fi
+else
+  echo "error writing to microSD; rebooting"
+  sleep 1
+  reboot
+fi
+
 if [ ! -f /bin/ArduPilot ]
 then
    echo "/bin/ardupilot not found"
