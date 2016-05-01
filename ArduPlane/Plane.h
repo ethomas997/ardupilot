@@ -1,7 +1,7 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 #pragma once
 
-#define THISFIRMWARE "ArduPlane V3.5.3"
+#define THISFIRMWARE "ArduPlane V3.5.3rel_rcApmAllCompExt"
 #define FIRMWARE_VERSION 3,5,3,FIRMWARE_VERSION_TYPE_OFFICIAL
 
 /*

@@ -91,8 +91,8 @@ bool AP_Compass_PX4::init(void)
             return false;                
         }
 
-        // remember if the compass is external
-        set_external(_instance[i], ioctl(_mag_fd[i], MAGIOCGEXTERNAL, 0) > 0);
+        // make all compasses external (fixes issues with PX4MiniAIO)
+        set_external(_instance[i], true);
         _count[i] = 0;
         _sum[i].zero();
 
