@@ -47,7 +47,8 @@ public:
 
     enum terminate_action {
         TERMINATE_ACTION_TERMINATE = 42,
-        TERMINATE_ACTION_LAND      = 43
+        TERMINATE_ACTION_LAND      = 43,
+        TERMINATE_ACTION_DISARM    = 44
     };
 
     // Constructor
