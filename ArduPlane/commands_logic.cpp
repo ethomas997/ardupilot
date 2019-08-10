@@ -158,7 +158,7 @@ bool Plane::start_command(const AP_Mission::Mission_Command& cmd)
             if (! geofence_set_floor_enabled(false)) {
                 gcs().send_text(MAV_SEVERITY_WARNING, "Unable to disable fence floor");
             } else {
-                gcs().send_text(MAV_SEVERITY_WARNING, "Fence floor disabled");
+                gcs().send_text(MAV_SEVERITY_INFO, "Fence floor disabled");
             }
         }    
 #endif
@@ -441,13 +441,17 @@ void Plane::do_land(const AP_Mission::Mission_Command& cmd)
     }
 
 #if GEOFENCE_ENABLED == ENABLED 
-    if (g.fence_autoenable == 1) {
+    if ((g.fence_autoenable == TAKEOFF_GFENABLE ||
+                                 g.fence_autoenable == AUTOMODE_GFENABLE) &&
+                                                       geofence_enabled()) {
         if (! geofence_set_enabled(false, AUTO_TOGGLED)) {
             gcs().send_text(MAV_SEVERITY_NOTICE, "Disable fence failed (autodisable)");
         } else {
             gcs().send_text(MAV_SEVERITY_NOTICE, "Fence disabled (autodisable)");
         }
-    } else if (g.fence_autoenable == 2) {
+    } else if ((g.fence_autoenable == TAKEOFF_NOFLOOR_GFENABLE ||
+                         g.fence_autoenable == AUTOMODE_NOFLOOR_GFENABLE) &&
+                                                       geofence_enabled()) {
         if (! geofence_set_floor_enabled(false)) {
             gcs().send_text(MAV_SEVERITY_NOTICE, "Disable fence floor failed (autodisable)");
         } else {
