@@ -10,6 +10,7 @@
 #define MIN_GEOFENCE_POINTS 5 // index [0] for return point, must be inside polygon
                               // index [1 to n-1] to define a polygon, minimum 3 for a triangle
                               // index [n] (must be same as index 1 to close the polygon)
+#define ACTION_DISARM_DELAYMS 5000     //delay between breach and disarm
 
 /*
  *  The state of geo-fencing. This structure is dynamically allocated
@@ -247,8 +248,9 @@ bool Plane::geofence_set_floor_enabled(bool floor_enable) {
     if (geofence_state == nullptr) {
         return false;
     }
-    
-    geofence_state->floor_enabled = floor_enable;
+    //if FENCE_ACTION_DISARM then never allow FENCE_BREACH_MINALT
+    geofence_state->floor_enabled =
+        (g.fence_action != FENCE_ACTION_DISARM) ? floor_enable : false;
     return true;
 }
 
@@ -353,30 +355,46 @@ void Plane::geofence_check(bool altitude_check_only)
     }
 
     // we are outside the fence
-    if (geofence_state->fence_triggered &&
-        (control_mode == GUIDED || control_mode == AVOID_ADSB || control_mode == RTL || g.fence_action == FENCE_ACTION_REPORT)) {
-        // we have already triggered, don't trigger again until the
-        // user disables/re-enables using the fence channel switch
-        return;
-    }
+    if (geofence_state->fence_triggered) {
+        if (control_mode == GUIDED || control_mode == AVOID_ADSB || control_mode == RTL || g.fence_action == FENCE_ACTION_REPORT) {
+            // we have already triggered, don't trigger again until the
+            // user disables/re-enables using the fence channel switch
+            return;
+        }
+        if (g.fence_action == FENCE_ACTION_DISARM && (!arming.is_armed() ||
+                millis() < geofence_state->breach_time + ACTION_DISARM_DELAYMS)) {
+            // motor not armed, or doing delay between fence breach and disarm
+            return;
+        }
+    } else {
 
-    // we are outside, and have not previously triggered.
-    geofence_state->fence_triggered = true;
-    geofence_state->breach_count++;
-    geofence_state->breach_time = millis();
-    geofence_state->breach_type = breach_type;
+        // we are outside, and have not previously triggered.
+        geofence_state->fence_triggered = true;
+        geofence_state->breach_count++;
+        geofence_state->breach_time = millis();
+        geofence_state->breach_type = breach_type;
 
  #if FENCE_TRIGGERED_PIN > 0
-    hal.gpio->pinMode(FENCE_TRIGGERED_PIN, HAL_GPIO_OUTPUT);
-    hal.gpio->write(FENCE_TRIGGERED_PIN, 1);
+        hal.gpio->pinMode(FENCE_TRIGGERED_PIN, HAL_GPIO_OUTPUT);
+        hal.gpio->write(FENCE_TRIGGERED_PIN, 1);
  #endif
 
-    gcs().send_text(MAV_SEVERITY_NOTICE,"Geofence triggered");
-    gcs().send_message(MSG_FENCE_STATUS);
+        gcs().send_text(MAV_SEVERITY_NOTICE,"Geofence triggered");
+        gcs().send_message(MSG_FENCE_STATUS);
+    }
 
     // see what action the user wants
     switch (g.fence_action) {
     case FENCE_ACTION_REPORT:
+        break;
+
+    case FENCE_ACTION_DISARM:
+        // check if delay time reached
+        if (millis() >= geofence_state->breach_time + ACTION_DISARM_DELAYMS) {
+            set_mode(STABILIZE, MODE_REASON_FENCE_BREACH);  //try to keep plane level
+            disarm_motors();           //stop motor
+            gcs().send_text(MAV_SEVERITY_WARNING, "Geofence disarmed motor");
+        }
         break;
 
     case FENCE_ACTION_GUIDED:
