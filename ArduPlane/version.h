@@ -6,7 +6,7 @@
 
 #include "ap_version.h"
 
-#define THISFIRMWARE "ArduPlane V3.9.10beta1"
+#define THISFIRMWARE "ArduPlane V3.9.10beta1 etFenceGPSbuz"
 
 // the following line is parsed by the autotest scripts
 #define FIRMWARE_VERSION 3,9,10,FIRMWARE_VERSION_TYPE_BETA
@@ -15,4 +15,3 @@
 #define FW_MINOR 9
 #define FW_PATCH 10
 #define FW_TYPE FIRMWARE_VERSION_TYPE_BETA
-
