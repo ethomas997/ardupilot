@@ -381,6 +381,22 @@ void Plane::update_GPS_50Hz(void)
  */
 void Plane::update_GPS_10Hz(void)
 {
+
+    // *** temp DEBUG test ***
+    static bool last_dtstflg = (hal.rcin->read(4) > 1750 && hal.rcin->read(4) < 2100);
+    bool dtstflg = (hal.rcin->read(4) > 1750 && hal.rcin->read(4) < 2100);
+    if (dtstflg != last_dtstflg) {
+        gps.lock_port(0, dtstflg);
+        last_dtstflg = dtstflg;
+        if (dtstflg) {
+            gcs().send_text(MAV_SEVERITY_WARNING,
+                                            "DEBUG gps-fail simulate FAIL");
+        } else {
+            gcs().send_text(MAV_SEVERITY_WARNING,
+                                            "DEBUG gps-fail simulate OK");
+        }
+    }
+
     static uint32_t last_gps_msg_ms;
     bool gps_ok_flag=true, xtrk_ok_flag=true;
     if (gps.last_message_time_ms() != last_gps_msg_ms && gps.status() >= AP_GPS::GPS_OK_FIX_3D) {
