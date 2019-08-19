@@ -51,6 +51,9 @@ bool Buzzer::init()
     // warning in plane and rover on every boot
     _flags.armed = AP_Notify::flags.armed;
     _flags.failsafe_battery = AP_Notify::flags.failsafe_battery;
+    _flags.failsafe_radio = false;
+    _flags.was_armed = false;
+    _flags.initialize_done = false;
     return true;
 }
 
@@ -164,10 +167,89 @@ void Buzzer::update()
                         break;
                 }
                 return;
+            case RADIOLOST_BUZZ:
+                // radio failsafe event (play short then long tone)
+                if (_pattern_counter != 2) {
+                    if (_pattern_counter >= 10) {
+                        on(false);
+                        // if system was (ever) armed then repeat indefinitely (for lost model locator)
+                        if (_flags.was_armed) {
+                            if (_pattern_counter >= 20) {
+                                _pattern_counter = 0;
+                            }
+                        } else {
+                            _pattern = NONE;
+                        }
+                    } else {
+                        on(true);
+                    }
+                } else {
+                    on(false);
+                }
+                break;
+            case RADIOBACK_BUZZ:
+                // radio recovered after failsafe (play long then short tone)
+                if (_pattern_counter != 5) {
+                    if (_pattern_counter >= 7) {
+                        _pattern = NONE;
+                        on(false);
+                    } else {
+                        on(true);
+                    }
+                } else {
+                    on(false);
+                }
+                break;
+            case INITIALIZE_BUZZ:
+                // play tones to inidicate system ready
+                switch (_pattern_counter) {
+                    case 1:
+                        on(true);
+                        break;
+                    case 2:
+                        on(false);
+                        break;
+                    case 3:
+                        on(true);
+                        break;
+                    case 4:
+                        on(false);
+                        break;
+                    case 5:
+                        on(true);
+                        break;
+                    case 6:
+                    default:
+                        on(false);
+                        _pattern = NONE;
+                        break;
+                }
+                break;
             default:
                 // do nothing
                 break;
         }
+    }
+
+    // check radio failsafe change
+    if (_flags.failsafe_radio != AP_Notify::flags.failsafe_radio && !AP_Notify::flags.initialising) {
+        _flags.failsafe_radio = AP_Notify::flags.failsafe_radio;
+        // play tone to indicate radio status
+        play_pattern(_flags.failsafe_radio ? RADIOLOST_BUZZ : RADIOBACK_BUZZ);
+        return;
+    }
+
+    // check if need to signal system initialization complete
+    if ((!_flags.initialize_done) && (!AP_Notify::flags.initialising)) {
+        _flags.initialize_done = true;
+        // play tone (only once) to indicate system ready
+        play_pattern(INITIALIZE_BUZZ);
+        return;
+    }
+    
+    // if playing continous radio-failsafe tones then ignore other notifications
+    if (_flags.failsafe_radio && _flags.was_armed) {
+        return;
     }
 
     // check if armed status has changed
@@ -175,6 +257,7 @@ void Buzzer::update()
         _flags.armed = AP_Notify::flags.armed;
         if (_flags.armed) {
             // double buzz when armed
+            _flags.was_armed = true;
             play_pattern(ARMING_BUZZ);
         }else{
             // single buzz when disarmed

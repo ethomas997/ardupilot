@@ -46,7 +46,10 @@ public:
         GPS_GLITCH = 3, // not used
         ARMING_BUZZ = 4,
         BARO_GLITCH = 5,
-        EKF_BAD = 6
+        EKF_BAD = 6,
+        RADIOLOST_BUZZ = 7,
+        RADIOBACK_BUZZ = 8,
+        INITIALIZE_BUZZ = 9
     };
 
     /// play_pattern - plays the defined buzzer pattern
@@ -61,6 +64,9 @@ private:
         uint8_t armed               : 1;    // 0 = disarmed, 1 = armed
         uint8_t failsafe_battery    : 1;    // 1 if battery failsafe has triggered
         uint8_t ekf_bad             : 1;    // 1 if ekf position has gone bad
+        uint8_t failsafe_radio      : 1;    // 1 if radio failsafe has triggered
+        uint8_t was_armed           : 1;    // 1 if system has been armed
+        uint8_t initialize_done     : 1;    // 1 if system initialization complete
     } _flags;
 
     uint8_t         _counter;           // reduces 50hz update down to 10hz for internal processing
