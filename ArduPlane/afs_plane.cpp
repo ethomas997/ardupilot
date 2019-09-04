@@ -15,36 +15,42 @@ AP_AdvancedFailsafe_Plane::AP_AdvancedFailsafe_Plane(AP_Mission &_mission, const
  */
 void AP_AdvancedFailsafe_Plane::terminate_vehicle(void)
 {
-    plane.g2.servo_channels.disable_passthrough(true);
-    
-    if (_terminate_action == TERMINATE_ACTION_LAND) {
-        plane.landing.terminate();
-    } else {
-        // aerodynamic termination is the default approach to termination
-        SRV_Channels::set_output_scaled(SRV_Channel::k_flap_auto, 100);
-        SRV_Channels::set_output_scaled(SRV_Channel::k_flap, 100);
-        SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, SERVO_MAX);
-        SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, SERVO_MAX);
-        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, SERVO_MAX);
-        if (plane.aparm.throttle_min < 0) {
-            // configured for reverse thrust, use TRIM
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttle, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttleLeft, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttleRight, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
+    if (_terminate_action != TERMINATE_ACTION_DISARM) {
+
+        plane.g2.servo_channels.disable_passthrough(true);
+
+        if (_terminate_action == TERMINATE_ACTION_LAND) {
+            plane.landing.terminate();
         } else {
-            // use MIN
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttle, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttleLeft, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
-            SRV_Channels::set_output_limit(SRV_Channel::k_throttleRight, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
+            // aerodynamic termination is the default approach to termination
+            SRV_Channels::set_output_scaled(SRV_Channel::k_flap_auto, 100);
+            SRV_Channels::set_output_scaled(SRV_Channel::k_flap, 100);
+            SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, SERVO_MAX);
+            SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, SERVO_MAX);
+            SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, SERVO_MAX);
+            if (plane.aparm.throttle_min < 0) {
+                // configured for reverse thrust, use TRIM
+                SRV_Channels::set_output_limit(SRV_Channel::k_throttle, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
+                SRV_Channels::set_output_limit(SRV_Channel::k_throttleLeft, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
+                SRV_Channels::set_output_limit(SRV_Channel::k_throttleRight, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
+            } else {
+                // use MIN
+                SRV_Channels::set_output_limit(SRV_Channel::k_throttle, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
+                SRV_Channels::set_output_limit(SRV_Channel::k_throttleLeft, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
+                SRV_Channels::set_output_limit(SRV_Channel::k_throttleRight, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
+            }
+            SRV_Channels::set_output_limit(SRV_Channel::k_manual, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
+            SRV_Channels::set_output_limit(SRV_Channel::k_none, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
         }
-        SRV_Channels::set_output_limit(SRV_Channel::k_manual, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
-        SRV_Channels::set_output_limit(SRV_Channel::k_none, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
+
+        plane.servos_output();
+
+        plane.quadplane.afs_terminate();
+
+    } else {  // for TERMINATE_ACTION_DISARM set Stablize mode and stop motor for glide to ground
+        plane.set_mode(STABILIZE, MODE_REASON_FENCE_BREACH);
     }
 
-    plane.servos_output();
-
-    plane.quadplane.afs_terminate();
-    
     // also disarm to ensure that ignition is cut
     plane.disarm_motors();
 }
