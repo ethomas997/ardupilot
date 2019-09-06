@@ -49,6 +49,7 @@ private:
     static const uint32_t INITIALISE_BUZZ = 0b10101100000000000000000000000000UL;
     static const uint32_t  RADIOLOST_BUZZ = 0b11011111110000000000000000000000UL;
     static const uint32_t  RADIOBACK_BUZZ = 0b01111010000000000000000000000000UL;
+    static const uint32_t   RADIOSOS_BUZZ = 0b00000101010111011101110101010000UL; // SOS pattern
 
     /// play_pattern - plays the defined buzzer pattern
     void play_pattern(const uint32_t pattern);
@@ -63,6 +64,7 @@ private:
         uint8_t initialise_started  : 1;    // 1 if system initialization started
         uint8_t initialise_done     : 1;    // 1 if system initialization complete
         uint8_t failsafe_radio      : 1;    // 1 if radio failsafe has triggered
+        uint8_t was_armed           : 1;    // 1 if system has been armed
     } _flags;
 
     uint32_t _pattern;           // current pattern

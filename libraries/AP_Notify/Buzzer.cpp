@@ -107,12 +107,20 @@ void Buzzer::update_pattern_to_play()
         }
     }
 
+    // if radio failsafe active and system was (ever) armed then
+    // repeat SOS beeps until radio recovered (for lost model locator)
+    if (_flags.failsafe_radio && _flags.was_armed) {
+        play_pattern(RADIOSOS_BUZZ);
+        return;
+    }
+
     // check if armed status has changed
     if (_flags.armed != AP_Notify::flags.armed) {
         _flags.armed = AP_Notify::flags.armed;
         if (_flags.armed) {
             // double buzz when armed
             play_pattern(ARMING_BUZZ);
+            _flags.was_armed = true;
         }else{
             // single buzz when disarmed
             play_pattern(SINGLE_BUZZ);
