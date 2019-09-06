@@ -49,6 +49,7 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
     SCHED_TASK(update_alt,             10,    200),
     SCHED_TASK(adjust_altitude_target, 10,    200),
     SCHED_TASK(afs_fs_check,           10,    100),
+    SCHED_TASK(lost_vehicle_check,     10,     50),
     SCHED_TASK(gcs_update,             50,    500),
     SCHED_TASK(gcs_data_stream_send,   50,    500),
     SCHED_TASK(update_events,          50,    150),
