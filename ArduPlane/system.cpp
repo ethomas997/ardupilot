@@ -1,6 +1,8 @@
 #include "Plane.h"
 #include <AP_Common/AP_FWVersion.h>
 
+#define LOST_VEHICLE_DELAY      10  // called at 10hz so 1 second
+
 /*****************************************************************************
 *   The init_ardupilot function processes everything we need for an in - air restart
 *        We will determine later if we are actually on the ground and process a
@@ -458,4 +460,32 @@ int8_t Plane::throttle_percentage(void)
         return constrain_int16(throttle, 0, 100);
     }
     return constrain_int16(throttle, -100, 100);
+}
+
+// check for pilot stick input to trigger lost vehicle alarm
+void Plane::lost_vehicle_check()
+{
+    static uint8_t soundalarm_counter;
+
+    // disable if aux switch is setup to vehicle alarm as the two could interfere
+    if (rc().find_channel_for_option(RC_Channel::AUX_FUNC::LOST_VEHICLE_SOUND)) {
+        return;
+    }
+
+    // ensure throttle is down, motors not armed, pitch and roll rc at max. Note: rc1=roll rc2=pitch
+    if ((channel_throttle->get_control_in() == 0) && !AP_Notify::flags.armed && (channel_roll->get_control_in() > 4000) && (channel_pitch->get_control_in() > 4000)) {
+        if (soundalarm_counter >= LOST_VEHICLE_DELAY) {
+            if (AP_Notify::flags.vehicle_lost == false) {
+                AP_Notify::flags.vehicle_lost = true;
+                gcs().send_text(MAV_SEVERITY_NOTICE,"Locate Plane alarm");
+            }
+        } else {
+            soundalarm_counter++;
+        }
+    } else {
+        soundalarm_counter = 0;
+        if (AP_Notify::flags.vehicle_lost == true) {
+            AP_Notify::flags.vehicle_lost = false;
+        }
+    }
 }
